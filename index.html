@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- Recommended meta tags -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+    <!-- PyScript CSS -->
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <!-- CSS for examples -->
+    <link rel="stylesheet" href="./assets/css/examples.css" />
+
+    <!-- This script tag bootstraps PyScript -->
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+
+    <style>
+        #loading { outline: none; border: none; background: transparent }
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.7.0/cdn/themes/light.css" />
+    <link rel="stylesheet" href="https://pyscript.net/releases/2023.03.1/pyscript.css" />
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.7.0/cdn/shoelace.js" ></script>
+    <script type="module" src="https://unpkg.com/@pyscript/core"></script>
+    <style>
+    body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    main {
+        width: 80%;
+    }
+    </style>
+</head>
+<body>
+<dialog id="loading">
+    <h1>Loading...</h1>
+</dialog>
+<main>
+<h1 id="page-title">Consensus-based optimization demo </h1>
+<canvas id="canvas" width="600" height="300" style="border:1px solid black;"></canvas>
+<h2>CBO Parameters </h2>
+<sl-range label="Sigma" help-text="Noise strength in the CBO algorithm" min="0" step="0.1" max="10" value="1.5" id="sigma-slider"></sl-range>
+<sl-range label="Alpha" help-text="Alpha parameter for the consensus computation" min="0" step="50" value="10" max="10000" id="alpha-slider"></sl-range>
+<sl-range label="dt"    help-text="Time-step parameter in the CBO algorithm" min="0" step="0.1" max="2." value="0.1" id="dt-slider"></sl-range>
+</main>
+
+<script type="py" src="./main.py" config="./pyscript.toml"></script>
+
+</body>
+</html>
