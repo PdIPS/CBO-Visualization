@@ -1,3 +1,6 @@
+#import numpy as np
+
+
 viridis_data = [
     (68, 1, 84),
     (71, 44, 122),
@@ -11,7 +14,6 @@ viridis_data = [
 ]
 
 def viridis(t):
-    # t ∈ [0,1], interpolate in viridis_data
     n = len(viridis_data)
     idx = t * (n - 1)
     i0 = int(idx)

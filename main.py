@@ -7,41 +7,107 @@ from cbx.objectives import Ackley
 from cbx.dynamics import CBO
 
 
+
+# %% Drawing utils
+# -----------------------------------------------------------------------------
+def draw_particle(X, ctx, WIDTH, HEIGHT, scale, color="rgb(230,0,0)", r=1):
+    """
+    Draws a particle at position X
+    """
+    x = ((X[0] / (2 * scale)) + 0.5) * WIDTH
+    y = ((X[1] / (2 * scale)) + 0.5) * HEIGHT
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.arc(x, y, 3 * r, 0, 2 * math.pi)
+    ctx.fill()
+
+def draw_line(X1,X2, ctx, WIDTH, HEIGHT, scale, color="rgb(230,0,0)"):
+    """
+    Draws a line from X1 to X2
+    """
+    x1 = ((X1[0] / (2 * scale)) + 0.5) * WIDTH
+    y1 = ((X1[1] / (2 * scale)) + 0.5) * HEIGHT
+    x2 = ((X2[0] / (2 * scale)) + 0.5) * WIDTH
+    y2 = ((X2[1] / (2 * scale)) + 0.5) * HEIGHT
+    ctx.strokeStyle = color
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(x1, y1)
+    ctx.lineTo(x2, y2)
+    ctx.stroke()
+
+class CBO_artist:
+    def __init__(self, ctx, WIDTH = 100, HEIGHT = 100 , scale = 10):
+        self.ctx = ctx
+        self.WIDTH  = WIDTH
+        self.HEIGHT = HEIGHT
+        self.scale = scale
+
+        XX, YY = ((Z - 0.5) * scale * 2 for Z in np.meshgrid(np.linspace(0, 1, self.WIDTH), np.linspace(0, 1, HEIGHT)))
+        self.XY = np.stack((XX.T,YY.T)).T
+
+    def draw_contour(self, loss):
+        # Background
+        self.ctx.fillStyle = "white"
+        self.ctx.fillRect(0, 0, self.WIDTH, self.HEIGHT)
+
+        Z = loss(self.XY)
+        Z = (Z - Z.min())/ (Z.max() - Z.min())
+
+        # Draw contour (optional: coarse grid)
+        for xi in range(0, self.WIDTH, 10):
+            for yi in range(0, self.HEIGHT, 10):
+                z = Z[yi, xi] #loss(np.array([xx, yy]))
+
+                val = np.clip(z, 0, 1)
+                self.ctx.fillStyle = viridis(val)    
+                self.ctx.fillRect(xi, yi, 10, 10)
+
+    
+    def draw_particles(self, DYN):
+        for i in range(DYN.N): # Draw particles
+            draw_line(DYN.x[0, i, :], DYN.consensus[0, 0, :], 
+                      self.ctx, 
+                      self.WIDTH, self.HEIGHT, self.scale, 
+                      color="rgb(170,0,0, 0.3)")
+            draw_particle(DYN.x[0, i, :], self.ctx, 
+                          self.WIDTH, self.HEIGHT, self.scale, color="rgb(230,0,0)")
+            
+        draw_particle(DYN.consensus[0, 0, :], self.ctx, 
+                      self.WIDTH, self.HEIGHT, self.scale, 
+                      color="rgb(200,200,200)", r=3)  # Draw consensus point
+#%% Set up Canvas
 canvas = document.getElementById("canvas")
 if canvas is None:
     print("Canvas not found.")
 ctx = canvas.getContext("2d")
+window.spinning = False
+ctx.clearRect(0, 0, canvas.width, canvas.height)
 WIDTH, HEIGHT = canvas.width, canvas.height
 
 
-# Sliders
-CBO_SIGMA = 1.5  # initial value, global
-CBO_ALPHA = 10.  # initial value, global
-CBO_DT    = 0.1  # initial value, global
+# %% Sliders
+# -----------------------------------------------------------------------------
+class AppParams:
+    def create_slider(self, name, val, slider_name):
+        setattr(self, name, val)
 
-def on_slider_change_SIGMA(event):
-    global CBO_SIGMA
-    CBO_SIGMA = float(event.target.value)
+        def local_on_slider_change(event):
+            setattr(self, name, event.target.value)
 
-CBO_SIGMA_SLIDER = document.getElementById("sigma-slider")
-CBO_SIGMA_SLIDER_proxy = create_proxy(on_slider_change_SIGMA)
-CBO_SIGMA_SLIDER.addEventListener("input", CBO_SIGMA_SLIDER_proxy)
+        slider = document.getElementById(slider_name)
+        slider.addEventListener("input", create_proxy(local_on_slider_change))
 
-def on_slider_change_ALPHA(event):
-    global CBO_ALPHA
-    CBO_ALPHA = float(event.target.value)
+AP = AppParams()
 
-CBO_ALPHA_SLIDER = document.getElementById("alpha-slider")
-CBO_ALPHA_SLIDER_proxy = create_proxy(on_slider_change_ALPHA)
-CBO_ALPHA_SLIDER.addEventListener("input", CBO_ALPHA_SLIDER_proxy)
+SliderParams = [
+    ("cbo_sigma", 1.5, "sigma-slider"), 
+    ("cbo_alpha", 10,  "alpha-slider"),
+    ("cbo_dt",   0.1,  "dt-slider"),
+    ("fps",       10,  "fps-slider")
+]
 
-def on_slider_change_DT(event):
-    global CBO_DT
-    CBO_DT = float(event.target.value)
-
-CBO_DT_SLIDER = document.getElementById("dt-slider")
-CBO_DT_SLIDER_proxy = create_proxy(on_slider_change_DT)
-CBO_DT_SLIDER.addEventListener("input", CBO_DT_SLIDER_proxy)
+for name, val, slider_name in SliderParams: AP.create_slider(name, val, slider_name)
 
 
 
@@ -98,6 +164,8 @@ def loss(x):
     return val
 
 
+# %% Consensus-based optimization setup
+# -----------------------------------------------------------------------------
 def post_process_cbx(dyn):
     dyn.x = np.clip(dyn.x, -1.5* scale, 1.5*scale)
 # Load CBX
@@ -106,95 +174,46 @@ x = np.random.uniform(-scale, scale, (1, 20, 2))  # 20 particles in 2D
 DYN = CBO(
     loss,
     x=x,
-    sigma = CBO_SIGMA,  # Use the global CBO_SIGMA
     post_process=post_process_cbx,
+    track_args = {'names':[]},
 )
 
-def draw_particle(X, color="rgb(230,0,0)", r=1):
-    global ctx, WIDTH, HEIGHT, scale
-    x = ((X[0] / (2 * scale)) + 0.5) * WIDTH
-    y = ((X[1] / (2 * scale)) + 0.5) * HEIGHT
-    ctx.fillStyle = color
-    ctx.beginPath()
-    ctx.arc(x, y, 3 * r, 0, 2 * math.pi)
-    ctx.fill()
-
-def draw_line(X1,X2, color="rgb(230,0,0)"):
-    global ctx, WIDTH, HEIGHT, scale
-    x1 = ((X1[0] / (2 * scale)) + 0.5) * WIDTH
-    y1 = ((X1[1] / (2 * scale)) + 0.5) * HEIGHT
-    x2 = ((X2[0] / (2 * scale)) + 0.5) * WIDTH
-    y2 = ((X2[1] / (2 * scale)) + 0.5) * HEIGHT
-    ctx.strokeStyle = color
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(x1, y1)
-    ctx.lineTo(x2, y2)
-    ctx.stroke()
-
-
-def set_CBO_params():
-    global DYN, CBO_SIGMA, CBO_ALPHA, CBO_DT, loss
-    DYN.sigma = CBO_SIGMA  # Update sigma in the CBO dynamics
-    DYN.alpha[:] = CBO_ALPHA
-    DYN.dt = CBO_DT
+def set_CBO_params(DYN, AP, loss):
+    DYN.sigma = getattr(AP, 'cbo_sigma', 1.)
+    DYN.alpha[:] = getattr(AP, 'cbo_alpha', 10.)
+    DYN.dt = getattr(AP, 'cbo_dt', 1.)
     DYN.f = loss 
 
-def update_and_draw_CBO(ts):
-    global DYN, ctx, WIDTH, HEIGHT, scale
-    set_CBO_params()  # Update CBO parameters
+set_CBO_params(DYN, AP, loss)
+
+def update_CBO(DYN, AP, loss):
+    set_CBO_params(DYN, AP, loss)  # Update CBO parameters
      # Update loss function
     DYN.step()
 
 
-    for i in range(DYN.N): # Draw particles
-        draw_line(DYN.x[0, i, :], DYN.consensus[0, 0, :], color="rgb(170,0,0, 0.3)")
-        draw_particle(DYN.x[0, i, :], color="rgb(230,0,0)")
-        
-    draw_particle(DYN.consensus[0, 0, :], color="rgb(200,200,200)", r=3)  # Draw consensus point
+#%% Set up Artist
+CBOA = CBO_artist(ctx, WIDTH = WIDTH, HEIGHT = HEIGHT, scale = scale)
 
-MIN, MAX = 0., 1.0
-
-def draw_contour(ts):
-    global MIN, MAX
-    # Background
-    ctx.fillStyle = "white"
-    ctx.fillRect(0, 0, WIDTH, HEIGHT)
-
-
-    # Draw contour (optional: coarse grid)
-    for xi in range(0, WIDTH, 10):
-        for yi in range(0, HEIGHT, 10):
-            xx = (xi / WIDTH - 0.5) * scale * 2
-            yy = (yi / HEIGHT - 0.5) * scale * 2
-            z = loss(np.array([xx, yy]))
-
-            if z < MIN: MIN = z
-            if z > MAX: MAX = z
-            # Normalize z to [0, 1] for colormap
-            z = (z - MIN) / (MAX - MIN)
-
-            val = np.clip(z, 0, 1)
-            ctx.fillStyle = viridis(val)    
-            ctx.fillRect(xi, yi, 10, 10)
-    
-
-def draw_sine(ts):
-    ctx.clearRect(0, 0, WIDTH, HEIGHT)
-    ctx.beginPath()
-    for x in range(WIDTH):
-        y = HEIGHT / 2 + (HEIGHT / 4) * math.sin((x / WIDTH) * 4 * math.pi + ts / 200)
-        if x == 0:
-            ctx.moveTo(x, y)
-        else:
-            ctx.lineTo(x, y)
-    ctx.stroke()
+#%% Frame Rate handling
+last_time = 0
+max_frame_rate = 10
 
 def animate(time):
-    draw_contour(time)
-    update_and_draw_CBO(time)
-    #draw_sine(time)
+    global last_time, CBOA, DYN, AP, loss
+
+    dt = time - last_time
+    fps = 1000 / dt if dt > 0 else 0
+    print(f"FPS: {fps:.1f}")
+
+    if fps < getattr(AP, 'fps', 10):
+        update_CBO(DYN, AP, loss)
+        CBOA.draw_contour(loss)
+        CBOA.draw_particles(DYN) 
+        last_time = time
     window.requestAnimationFrame(animate_proxy)
+    
+    
 
 animate_proxy = create_proxy(animate)
 window.requestAnimationFrame(animate_proxy)
