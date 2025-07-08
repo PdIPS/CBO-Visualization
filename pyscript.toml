@@ -1,6 +1,6 @@
 name = "Matplotlib"
 description = "A simple application showing how to use Matplotlib to generate a graph and display it with PyScript."
-packages = ["matplotlib", "scipy", "https://files.pythonhosted.org/packages/3f/af/ddc0366079b447759224d5ad92020eea6082cd9db490ef4c6633d3f63c08/cbx-1.0.1-py3-none-any.whl"]
+packages = ["matplotlib", "scipy", "cbx>=1.0.0"]
 
 
 [files]
